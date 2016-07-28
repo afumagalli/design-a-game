@@ -24,7 +24,7 @@ class Game(ndb.Model):
 	game_over = ndb.BooleanProperty(required=True, default=False)
 
 	@classmethod
-	def new_game(cls, user, number=None):
+	def new_game(cls, user):
 		"""Creates and returns a new game"""
 		# if number:
 		# 	word = POKEMON_LIST.get_name(number)

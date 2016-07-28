@@ -45,16 +45,51 @@ class PokemonHangmanAPI(remote.Service):
         if not user:
             raise endpoints.NotFoundException("A user with that name does not exist!")
         try:
-            game = Game.new_game(user.key, request.)
+            game = Game.new_game(user.key)
+        # Task queue updates average score.
+        taskqueue.add(url="/tasks/cache_average_attempts")
+        return game.to_form("Good luck playing Pokemon Hangman!")
 
-
+    @endpoints.method(request_message=GET_GAME_REQUEST,
+                      response_message=GameForm,
+                      path="game/{urlsafe_game_key}",
+                      name="get_game",
+                      http_method="GET")
     def get_game(self, request):
-        pass
+        """Return the current game state"""
+        game = get_by_urlsafe(request.urlsafe_game_key, Game)
+        if game:
+            return game.to_form("Guess a letter!")
+        else:
+            raise endpoints.NotFoundException("Game not found!")
+
+    @endpoints.method(request_message=GUESS_LETTER_REQUEST,
+                      response_message=GameForm,
+                      path="game/{urlsafe_game_key}",
+                      name="guess_letter",
+                      http_method="PUT")
     def guess_letter(self, request):
-        pass
-    def word_so_far(self, request):
-        pass
-    def all_words_so_far(self, request):
-        pass
-    def all_user_words_so_far(self, request):
-        pass
+        """Guesses a letter. Returns game state with message."""
+        game = get_by_urlsafe(request.urlsafe_game_key, Game)
+        if game.game_over:
+            return game.to_form("Game is already over!")
+        if request.guess in game.guessed_letters:
+            return game.to_form("You already guessed that letter!")
+        game.attempts_remaining -= 1
+        game.guessed_letters += request.guess
+        if request.guess in game.word:
+            guess_instances = [i for i, ltr in enumerate(game.word.lower()) if ltr == request.guess]
+            for i in guess_instances:
+                game.word_so_far = game.word_so_far.replace(game.word_so_far[i], request.guess)
+            if game.word_so_far = game.word:
+                game.end_game(True)
+                return game.to_form("You won!")
+            else:
+                game.put()
+                game.to_form("Correct guess!")
+        elif game.attempts_remaining < 1:
+            game.end_game(False)
+            return game.to_form("Game over!")
+        else:
+            game.put()
+            game.to_form("Incorrect guess!")
