@@ -9,6 +9,8 @@ from google.appengine.api import taskqueue
 from models import User, Game, Score
 from models import NewGameForm, GuessLetterForm, String Message
 
+from utils import get_by_urlsafe
+
 
 NEW_GAME_REQUEST = endpoints.ResourceContainer(NewGameForm)
 GET_GAME_REQUEST = endpoints.ResourceContainer(urlsafe_game_key=messages.StringField(1),)
