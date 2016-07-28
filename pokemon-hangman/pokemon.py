@@ -15,7 +15,7 @@ class PokemonNames():
 
     def get_from_file(self, filePath):
         """Read the txt file containing all Pokemon names"""
-        file = open(filePath, 'r+')
+        file = open(filePath, 'r')
         lines = file.readlines()
         self.totalCount = len(lines)
         for index, val in enumerate(lines):

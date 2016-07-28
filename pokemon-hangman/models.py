@@ -8,19 +8,19 @@ from google.appengine.ext import ndb
 
 POKEMON_LIST = PokemonNames()
 
-class User(ndb.model):
+class User(ndb.Model):
 	"""User profile object"""
-	name = ndb.StringProprery(required=True)
-	email = ndb.StringProprery()
+	name = ndb.StringProperty(required=True)
+	email = ndb.StringProperty()
 
 
 class Game(ndb.Model):
 	"""Game object"""
 	user = ndb.KeyProperty(required=True, kind="User")
-	word = ndb.StringProprery(required=True)
-	word_so_far = ndb.StringProprery(required=True)
+	word = ndb.StringProperty(required=True)
+	word_so_far = ndb.StringProperty(required=True)
 	attempts_remaining = ndb.IntegerProperty(required=True, default=6)
-	guessed_letters = ndb.StringProprery(required=True, default="")
+	guessed_letters = ndb.StringProperty(required=True, default="")
 	game_over = ndb.BooleanProperty(required=True, default=False)
 
 	@classmethod
@@ -48,6 +48,7 @@ class Game(ndb.Model):
 		form.attempts_remaining = self.attempts_remaining
 		form.game_over = self.game_over
 		form.message = message
+		form.word_so_far = self.word_so_far
 		return form
 
 	def end_game(self, won=False):
@@ -76,6 +77,7 @@ class GameForm(messages.Message):
 	game_over = messages.BooleanField(3, required=True)
 	message = messages.StringField(4, required=True)
 	user_name = messages.StringField(5, required=True)
+	word_so_far = messages.StringField(6, required=True)
 
 
 class NewGameForm(messages.Message):
@@ -104,4 +106,4 @@ class ScoreForms(messages.Message):
 
 class StringMessage(messages.Message):
 	"""Outbound single string message"""
-	message = message.StringField(1, required=True)
+	message = messages.StringField(1, required=True)
