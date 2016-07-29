@@ -32,7 +32,8 @@ class Game(ndb.Model):
 		# 	word = POKEMON_LIST.get_random_name()
 		word = POKEMON_LIST.get_random_name()
 		word_so_far = "_" * len(word)
-		game = Game(user=user,
+		game = Game(parent=user,
+					user=user,
 					word=word,
 					word_so_far=word_so_far,
 					attempts_remaining=6,
@@ -78,6 +79,10 @@ class GameForm(messages.Message):
 	message = messages.StringField(4, required=True)
 	user_name = messages.StringField(5, required=True)
 	word_so_far = messages.StringField(6, required=True)
+
+class GameForms(messages.Message):
+	"""Return multiple GameForms"""
+	items = messages.MessageField(GameForm, 1, repeated=True)
 
 
 class NewGameForm(messages.Message):

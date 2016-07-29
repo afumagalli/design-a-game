@@ -7,15 +7,17 @@ from google.appengine.api import memcache
 from google.appengine.api import taskqueue
 
 from models import User, Game, Score
-from models import GameForm, NewGameForm, GuessLetterForm, StringMessage
+from models import GameForm, GameForms, NewGameForm, GuessLetterForm, StringMessage
 
 from utils import get_by_urlsafe
 
 
+USER_REQUEST = endpoints.ResourceContainer(user_name=messages.StringField(1), email=messages.StringField(2))
 NEW_GAME_REQUEST = endpoints.ResourceContainer(NewGameForm)
 GET_GAME_REQUEST = endpoints.ResourceContainer(urlsafe_game_key=messages.StringField(1),)
 GUESS_LETTER_REQUEST = endpoints.ResourceContainer(GuessLetterForm, urlsafe_game_key=messages.StringField(1),)
-USER_REQUEST = endpoints.ResourceContainer(user_name=messages.StringField(1), email=messages.StringField(2))
+GET_USER_GAMES_REQUEST = endpoints.ResourceContainer(urlsafe_user_key=messages.StringField(1),)
+CANCEL_GAME_REQUEST = endpoints.ResourceContainer(urlsafe_game_key=messages.StringField(1),)
 MEMCACHE_GUESSES_REMAINING = "GUESSES_REMAINING"
 
 
@@ -95,5 +97,35 @@ class PokemonHangmanAPI(remote.Service):
 			else:
 				game.put()
 				return game.to_form("Incorrect guess!")
+
+	@endpoints.method(request_message=GET_USER_GAMES_REQUEST,
+					  response_message=GameForms,
+					  path="user-games/{urlsafe_user_key}",
+					  name="get_user_games",
+					  http_method="GET")
+	def get_user_games(self, request):
+		user = get_by_urlsafe(request.urlsafe_user_key, User)
+		if user:
+			query = Game.query(ancestor=user.key)
+			return GameForms(items=[game.to_form("") for game in query])
+		else:
+			raise endpoints.NotFoundException("User not found!")
+
+	# @endpoints.method(request_message=CANCEL_GAME_REQUEST,
+	# 				  response_message=GameForm,
+	# 				  path="game/{urlsafe_game_key}",
+	# 				  name="cancel_game",
+	# 				  http_method="GET")
+	def cancel_game(self, request):
+		pass
+
+	def get_high_scores(self, request):
+		pass
+
+	def get_user_rankings(self, request):
+		pass
+
+	def get_game_history(self, request):
+		pass
 
 api = endpoints.api_server([PokemonHangmanAPI])
