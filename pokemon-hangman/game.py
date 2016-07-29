@@ -45,6 +45,7 @@ class PokemonHangmanAPI(remote.Service):
 					  name="new_game",
 					  http_method="POST")
 	def new_game(self, request):
+		"""Create a new game."""
 		user = User.query(User.name == request.user_name).get()
 		if not user:
 			raise endpoints.NotFoundException("A user with that name does not exist!")
@@ -104,6 +105,7 @@ class PokemonHangmanAPI(remote.Service):
 					  name="get_user_games",
 					  http_method="GET")
 	def get_user_games(self, request):
+		"""Get all games created by user."""
 		user = get_by_urlsafe(request.urlsafe_user_key, User)
 		if user:
 			query = Game.query(ancestor=user.key)
@@ -111,13 +113,19 @@ class PokemonHangmanAPI(remote.Service):
 		else:
 			raise endpoints.NotFoundException("User not found!")
 
-	# @endpoints.method(request_message=CANCEL_GAME_REQUEST,
-	# 				  response_message=GameForm,
-	# 				  path="game/{urlsafe_game_key}",
-	# 				  name="cancel_game",
-	# 				  http_method="GET")
+	@endpoints.method(request_message=CANCEL_GAME_REQUEST,
+					  response_message=GameForm,
+					  path="game/{urlsafe_game_key}/cancel",
+					  name="cancel_game",
+					  http_method="PUT")
 	def cancel_game(self, request):
-		pass
+		"""Cancels a game by deleting it from the Datastore"""
+		game = get_by_urlsafe(request.urlsafe_game_key, Game)
+		if game.game_over:
+			return game.to_form("Game is already over!")
+		form = game.to_form("Game cancelled")
+		game.key.delete()
+		return form
 
 	def get_high_scores(self, request):
 		pass
