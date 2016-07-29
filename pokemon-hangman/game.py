@@ -7,7 +7,7 @@ from google.appengine.api import memcache
 from google.appengine.api import taskqueue
 
 from models import User, Game, Score
-from models import GameForm, GameForms, NewGameForm, GuessLetterForm, StringMessage
+from models import GameForm, GameForms, NewGameForm, GuessLetterForm, ScoreForm, ScoreForms, StringMessage
 
 from utils import get_by_urlsafe
 
@@ -99,6 +99,36 @@ class PokemonHangmanAPI(remote.Service):
 				game.put()
 				return game.to_form("Incorrect guess!")
 
+	@endpoints.method(response_message=ScoreForms,
+					  path='scores',
+					  name='get_scores',
+					  http_method='GET')
+	def get_scores(self, request):
+		"""Return all scores"""
+		return ScoreForms(items=[score.to_form() for score in Score.query()])
+
+	@endpoints.method(request_message=USER_REQUEST,
+					  response_message=ScoreForms,
+					  path='scores/user/{user_name}',
+					  name='get_user_scores',
+					  http_method='GET')
+	def get_user_scores(self, request):
+		"""Returns all of an individual User's scores"""
+		user = User.query(User.name == request.user_name).get()
+		if not user:
+			raise endpoints.NotFoundException(
+					'A User with that name does not exist!')
+		scores = Score.query(Score.user == user.key)
+		return ScoreForms(items=[score.to_form() for score in scores])
+
+	@endpoints.method(response_message=StringMessage,
+					  path='games/average_attempts',
+					  name='get_average_attempts_remaining',
+					  http_method='GET')
+	def get_average_attempts(self, request):
+		"""Get the cached average moves remaining"""
+		return StringMessage(message=memcache.get(MEMCACHE_GUESSES_REMAINING) or '')
+
 	@endpoints.method(request_message=GET_USER_GAMES_REQUEST,
 					  response_message=GameForms,
 					  path="user-games/{urlsafe_user_key}",
@@ -127,6 +157,11 @@ class PokemonHangmanAPI(remote.Service):
 		game.key.delete()
 		return form
 
+	# @endpoints.method(request_message=GET_HIGH_SCORES_REQUEST,
+	# 				  response_message=GameForm,
+	# 				  path="game/{urlsafe_game_key}/cancel",
+	# 				  name="cancel_game",
+	# 				  http_method="PUT")
 	def get_high_scores(self, request):
 		pass
 
@@ -135,5 +170,17 @@ class PokemonHangmanAPI(remote.Service):
 
 	def get_game_history(self, request):
 		pass
+
+	@staticmethod
+	def _cache_average_attempts():
+		"""Populates memcache with the average moves remaining of Games"""
+		games = Game.query(Game.game_over == False).fetch()
+		if games:
+			count = len(games)
+			total_attempts_remaining = sum([game.attempts_remaining
+										for game in games])
+			average = float(total_attempts_remaining)/count
+			memcache.set(MEMCACHE_GUESSES_REMAINING,
+						 'The average moves remaining is {:.2f}'.format(average))
 
 api = endpoints.api_server([PokemonHangmanAPI])
