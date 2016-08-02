@@ -18,7 +18,6 @@ USER_REQUEST = endpoints.ResourceContainer(user_name=messages.StringField(1), em
 NEW_GAME_REQUEST = endpoints.ResourceContainer(NewGameForm)
 GAME_REQUEST = endpoints.ResourceContainer(urlsafe_game_key=messages.StringField(1))
 GUESS_REQUEST = endpoints.ResourceContainer(GuessForm, urlsafe_game_key=messages.StringField(1))
-CANCEL_GAME_REQUEST = endpoints.ResourceContainer(urlsafe_game_key=messages.StringField(1))
 HIGH_SCORES_REQUEST = endpoints.ResourceContainer(number_of_results=messages.IntegerField(1))
 MEMCACHE_GUESSES_REMAINING = "GUESSES_REMAINING"
 
@@ -210,7 +209,7 @@ class PokemonHangmanAPI(remote.Service):
 		return GameForms(items=[game.to_form("") for game in query])
 
 
-	@endpoints.method(request_message=CANCEL_GAME_REQUEST,
+	@endpoints.method(request_message=GAME_REQUEST,
 					  response_message=GameForm,
 					  path="game/{urlsafe_game_key}/cancel",
 					  name="cancel_game",
