@@ -13,6 +13,12 @@ class User(ndb.Model):
 	name = ndb.StringProperty(required=True)
 	email = ndb.StringProperty()
 
+	def to_form(self, total_score):
+		form = UserForm()
+		form.user_name = self.name
+		form.total_score = total_score
+		return form
+
 
 class Game(ndb.Model):
 	"""Game object"""
@@ -55,13 +61,15 @@ class Game(ndb.Model):
 	def end_game(self, won=False):
 		self.game_over = True
 		self.put()
-		# Update scoreboard
-		score = Score(user=self.user, date=date.today(), won=won, score=self.attempts_remaining)
+		score = Score(parent=self.user, user=self.user, date=date.today(), won=won, score=self.attempts_remaining)
 		score.put()
 
 
 class Score(ndb.Model):
 	"""Score object"""
+	# TODO
+	# Redefine score as number of _ remaining when word correctly guessed
+	# (perhaps as percentage of length of word to normalize length of word)
 	user = ndb.KeyProperty(required=True, kind="User")
 	date = ndb.DateProperty(required=True)
 	won = ndb.BooleanProperty(required=True)
@@ -69,6 +77,15 @@ class Score(ndb.Model):
 
 	def to_form(self):
 		return ScoreForm(user_name=self.user.get().name, won=self.won, date=str(self.date), score=self.score)
+
+
+class UserForm(messages.Message):
+	user_name = messages.StringField(1, required=True)
+	total_score = messages.IntegerField(2, required=True)
+
+
+class UserForms(messages.Message):
+	items = messages.MessageField(UserForm, 1, repeated=True)
 
 
 class GameForm(messages.Message):
@@ -91,7 +108,7 @@ class NewGameForm(messages.Message):
 	#number = messages.BooleanField(2, required=False)
 
 
-class GuessLetterForm(messages.Message):
+class GuessForm(messages.Message):
 	"""Form to guess a letter in the word"""
 	guess = messages.StringField(1, required=True)
 
@@ -101,7 +118,7 @@ class ScoreForm(messages.Message):
 	user_name = messages.StringField(1, required=True)
 	date = messages.StringField(2, required=True)
 	won = messages.BooleanField(3, required=True)
-	score = messages.IntegerField(4, required=True)
+	score = messages.FloatField(4, required=True)
 
 
 class ScoreForms(messages.Message):

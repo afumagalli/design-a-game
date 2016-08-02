@@ -7,17 +7,18 @@ from google.appengine.api import memcache
 from google.appengine.api import taskqueue
 
 from models import User, Game, Score
-from models import GameForm, GameForms, NewGameForm, GuessLetterForm, ScoreForm, ScoreForms, StringMessage
+from models import UserForm, UserForms, GameForm, GameForms, NewGameForm, GuessForm, ScoreForm, ScoreForms, StringMessage
 
 from utils import get_by_urlsafe
 
 
 USER_REQUEST = endpoints.ResourceContainer(user_name=messages.StringField(1), email=messages.StringField(2))
 NEW_GAME_REQUEST = endpoints.ResourceContainer(NewGameForm)
-GET_GAME_REQUEST = endpoints.ResourceContainer(urlsafe_game_key=messages.StringField(1),)
-GUESS_LETTER_REQUEST = endpoints.ResourceContainer(GuessLetterForm, urlsafe_game_key=messages.StringField(1),)
-GET_USER_GAMES_REQUEST = endpoints.ResourceContainer(urlsafe_user_key=messages.StringField(1),)
-CANCEL_GAME_REQUEST = endpoints.ResourceContainer(urlsafe_game_key=messages.StringField(1),)
+GAME_REQUEST = endpoints.ResourceContainer(urlsafe_game_key=messages.StringField(1))
+GUESS_REQUEST = endpoints.ResourceContainer(GuessForm, urlsafe_game_key=messages.StringField(1),)
+GET_USER_GAMES_REQUEST = endpoints.ResourceContainer(urlsafe_user_key=messages.StringField(1))
+CANCEL_GAME_REQUEST = endpoints.ResourceContainer(urlsafe_game_key=messages.StringField(1))
+HIGH_SCORES_REQUEST = endpoints.ResourceContainer(number_of_results=messages.IntegerField(1))
 MEMCACHE_GUESSES_REMAINING = "GUESSES_REMAINING"
 
 
@@ -39,6 +40,7 @@ class PokemonHangmanAPI(remote.Service):
 		user.put()
 		return StringMessage(message="User {} created!".format(request.user_name))
 
+
 	@endpoints.method(request_message=NEW_GAME_REQUEST,
 					  response_message=GameForm,
 					  path="game",
@@ -54,7 +56,8 @@ class PokemonHangmanAPI(remote.Service):
 		# taskqueue.add(url="/tasks/cache_average_attempts")
 		return game.to_form("Good luck playing Pokemon Hangman!")
 
-	@endpoints.method(request_message=GET_GAME_REQUEST,
+
+	@endpoints.method(request_message=GAME_REQUEST,
 					  response_message=GameForm,
 					  path="game/{urlsafe_game_key}",
 					  name="get_game",
@@ -67,13 +70,16 @@ class PokemonHangmanAPI(remote.Service):
 		else:
 			raise endpoints.NotFoundException("Game not found!")
 
-	@endpoints.method(request_message=GUESS_LETTER_REQUEST,
+
+	@endpoints.method(request_message=GUESS_REQUEST,
 					  response_message=GameForm,
-					  path="game/{urlsafe_game_key}",
+					  path="game/{urlsafe_game_key}/letter",
 					  name="guess_letter",
 					  http_method="PUT")
 	def guess_letter(self, request):
 		"""Guesses a letter. Returns game state with message."""
+		# TODO
+		# Allow user to guess multiple letters at a time
 		game = get_by_urlsafe(request.urlsafe_game_key, Game)
 		if game.game_over:
 			return game.to_form("Game is already over!")
@@ -99,6 +105,29 @@ class PokemonHangmanAPI(remote.Service):
 				game.put()
 				return game.to_form("Incorrect guess!")
 
+
+	@endpoints.method(request_message=GUESS_REQUEST,
+					  response_message=GameForm,
+					  path="game/{urlsafe_game_key}/word",
+					  name="guess_word",
+					  http_method="PUT")
+	def guess_word(self, request):
+		game = get_by_urlsafe(request.urlsafe_game_key, Game)
+		if game.game_over:
+			return game.to_form("Game is already over!")
+		if request.guess.lower() == game.word.lower():
+			game.word_so_far = game.word
+			game.end_game(True)
+			return game.to_form("You won!")
+		game.attempts_remaining -= 1
+		if game.attempts_remaining < 1:
+			game.end_game(False)
+			return game.to_form("Game over!")
+		else:
+			game.put()
+			return game.to_form("Incorrect guess!")
+
+
 	@endpoints.method(response_message=ScoreForms,
 					  path='scores',
 					  name='get_scores',
@@ -106,6 +135,7 @@ class PokemonHangmanAPI(remote.Service):
 	def get_scores(self, request):
 		"""Return all scores"""
 		return ScoreForms(items=[score.to_form() for score in Score.query()])
+
 
 	@endpoints.method(request_message=USER_REQUEST,
 					  response_message=ScoreForms,
@@ -121,6 +151,7 @@ class PokemonHangmanAPI(remote.Service):
 		scores = Score.query(Score.user == user.key)
 		return ScoreForms(items=[score.to_form() for score in scores])
 
+
 	@endpoints.method(response_message=StringMessage,
 					  path='games/average_attempts',
 					  name='get_average_attempts_remaining',
@@ -129,9 +160,10 @@ class PokemonHangmanAPI(remote.Service):
 		"""Get the cached average moves remaining"""
 		return StringMessage(message=memcache.get(MEMCACHE_GUESSES_REMAINING) or '')
 
+
 	@endpoints.method(request_message=GET_USER_GAMES_REQUEST,
 					  response_message=GameForms,
-					  path="user-games/{urlsafe_user_key}",
+					  path="user_games/{urlsafe_user_key}",
 					  name="get_user_games",
 					  http_method="GET")
 	def get_user_games(self, request):
@@ -142,6 +174,7 @@ class PokemonHangmanAPI(remote.Service):
 			return GameForms(items=[game.to_form("") for game in query])
 		else:
 			raise endpoints.NotFoundException("User not found!")
+
 
 	@endpoints.method(request_message=CANCEL_GAME_REQUEST,
 					  response_message=GameForm,
@@ -157,19 +190,44 @@ class PokemonHangmanAPI(remote.Service):
 		game.key.delete()
 		return form
 
-	# @endpoints.method(request_message=GET_HIGH_SCORES_REQUEST,
-	# 				  response_message=GameForm,
-	# 				  path="game/{urlsafe_game_key}/cancel",
-	# 				  name="cancel_game",
-	# 				  http_method="PUT")
+
+	@endpoints.method(request_message=HIGH_SCORES_REQUEST,
+					  response_message=ScoreForms,
+					  path="high_scores",
+					  name="get_high_scores",
+					  http_method="GET")
 	def get_high_scores(self, request):
-		pass
+		number_of_results = 5 # default
+		if request.number_of_results:
+			number_of_results = request.number_of_results
+		query = Score.query().order(-Score.score)
+		results = query.fetch(limit=number_of_results)
+		return ScoreForms(items=[result.to_form() for result in results])
 
+
+	@endpoints.method(response_message=UserForms,
+					  path="user_rankings",
+					  name="get_user_rankings",
+					  http_method="GET")
 	def get_user_rankings(self, request):
-		pass
+		results = []
+		users = User.query()
+		for user in users:
+			query = Score.query(ancestor=user.key)
+			total_score = sum([score.score for score in query])
+			results.append((user, total_score))
+		results.sort(key=lambda tup: tup[1], reverse=True)
+		return UserForms(items=[result[0].to_form(result[1]) for result in results])
 
-	def get_game_history(self, request):
-		pass
+
+	# @endpoints.method(request_message=GAME_REQUEST,
+	# 				  response_message=GameForm,
+	# 				  path="game/{urlsafe_game_key}/history",
+	# 				  name="get_game_history",
+	# 				  http_method="GET")
+	# def get_game_history(self, request):
+	# 	pass
+
 
 	@staticmethod
 	def _cache_average_attempts():
