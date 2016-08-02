@@ -38,3 +38,5 @@ The API contains the following endpoints:
 `get_game_history`: Returns a history of all the moves made in a game along with their results
 
 Also contained in this project is a cron job to send an hourly email to all users with an unfinished game in the Datastore.
+
+You can interact with this API online at: pokemon-hangman.appspot.com/_ah/api/explorer

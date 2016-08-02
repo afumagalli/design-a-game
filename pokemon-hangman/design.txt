@@ -1,0 +1,9 @@
+What additional properties did you add to your models and why?
+To the Game model, I added properties for "word_so_far", "past_guesses", and "penalty". While "word" wasn't present in the Skeleton, it is effectively the same as "target". "word_so_far" was needed to know what blanks had already been filled in, "past_guesses" was needed to ensure the user was not re-guessing a letter or word (in a future version, this can be handled by the History model), and "penalty" was needed to keep track of the current penalty in the game.
+
+A History model was also added in order to create the game history. This model's parent is a Game and contains a "guess" (either a letter or word), "message" (what was output to the user when they made the guess), and "order" (to make sure we return game history in the right order).
+
+What were some of the trade-offs or struggles you faced when implementing the new game logic?
+Initially, I did not want to store the history in the Datastore. I figured I could use the "past_guesses" field of the Game model to recreate a game and return it's history. This proved difficult to do without re-writing the game logic in the "get_game_history" endpoint. Therefore, it was much simpler to store that information in a new model as a child of the Game.
+
+I also went through several iterations of defining a score. Initially, score was defined as the number of attempts remaining when the user correctly guessed the word. However, it seemed unfair to reward players who guessed each individual letter the same as those who figured out the word faster. Thus I came up with the algorithm for computing score based on blanks remaining. But since words could be variable in length, there also had to be some correction for word length as well. Finally, I wanted to encourage players to guess letters and not just words, so I created the penalty for incorrect word guesses.
