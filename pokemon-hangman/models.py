@@ -28,6 +28,7 @@ class Game(ndb.Model):
 	attempts_remaining = ndb.IntegerProperty(required=True, default=6)
 	guessed_letters = ndb.StringProperty(required=True, default="")
 	game_over = ndb.BooleanProperty(required=True, default=False)
+	penalty = ndb.FloatProperty(required=True, default=0.0)
 
 	@classmethod
 	def new_game(cls, user):
@@ -58,10 +59,10 @@ class Game(ndb.Model):
 		form.word_so_far = self.word_so_far
 		return form
 
-	def end_game(self, won=False):
+	def end_game(self, won=False, score=0):
 		self.game_over = True
 		self.put()
-		score = Score(parent=self.user, user=self.user, date=date.today(), won=won, score=self.attempts_remaining)
+		score = Score(parent=self.user, user=self.user, date=date.today(), won=won, score=score)
 		score.put()
 
 
@@ -73,7 +74,7 @@ class Score(ndb.Model):
 	user = ndb.KeyProperty(required=True, kind="User")
 	date = ndb.DateProperty(required=True)
 	won = ndb.BooleanProperty(required=True)
-	score = ndb.IntegerProperty(required=True)
+	score = ndb.FloatProperty(required=True)
 
 	def to_form(self):
 		return ScoreForm(user_name=self.user.get().name, won=self.won, date=str(self.date), score=self.score)
@@ -81,7 +82,7 @@ class Score(ndb.Model):
 
 class UserForm(messages.Message):
 	user_name = messages.StringField(1, required=True)
-	total_score = messages.IntegerField(2, required=True)
+	total_score = messages.FloatField(2, required=True)
 
 
 class UserForms(messages.Message):

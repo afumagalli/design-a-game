@@ -1,5 +1,7 @@
 """game.py - Description here."""
 
+from __future__ import division
+import math
 import logging
 import endpoints
 from protorpc import remote, messages
@@ -53,7 +55,7 @@ class PokemonHangmanAPI(remote.Service):
 			raise endpoints.NotFoundException("A user with that name does not exist!")
 		game = Game.new_game(user.key)
 		# Task queue updates average score.
-		# taskqueue.add(url="/tasks/cache_average_attempts")
+		taskqueue.add(url="/tasks/cache_average_attempts")
 		return game.to_form("Good luck playing Pokemon Hangman!")
 
 
@@ -63,7 +65,7 @@ class PokemonHangmanAPI(remote.Service):
 					  name="get_game",
 					  http_method="GET")
 	def get_game(self, request):
-		"""Return the current game state"""
+		"""Return the current game state."""
 		game = get_by_urlsafe(request.urlsafe_game_key, Game)
 		if game:
 			return game.to_form("Guess a letter!")
@@ -78,8 +80,6 @@ class PokemonHangmanAPI(remote.Service):
 					  http_method="PUT")
 	def guess_letter(self, request):
 		"""Guesses a letter. Returns game state with message."""
-		# TODO
-		# Allow user to guess multiple letters at a time
 		game = get_by_urlsafe(request.urlsafe_game_key, Game)
 		if game.game_over:
 			return game.to_form("Game is already over!")
@@ -91,16 +91,18 @@ class PokemonHangmanAPI(remote.Service):
 			for i in guess_instances:
 				game.word_so_far = game.word_so_far[:i] + game.word[i] + game.word_so_far[i+1:]
 			if game.word_so_far == game.word:
-				game.end_game(True)
-				return game.to_form("You won!")
+				# 1 point for guessing final letter
+				game.end_game(True, 1.0)
+				return game.to_form("You won! Score is 1.")
 			else:
 				game.put()
 				return game.to_form("Correct guess!")
 		else:
 			game.attempts_remaining -= 1
 			if game.attempts_remaining < 1:
-				game.end_game(False)
-				return game.to_form("Game over!")
+				# 0 points for loss
+				game.end_game(False, 0.0)
+				return game.to_form("Game over! Score is 0.")
 			else:
 				game.put()
 				return game.to_form("Incorrect guess!")
@@ -112,20 +114,33 @@ class PokemonHangmanAPI(remote.Service):
 					  name="guess_word",
 					  http_method="PUT")
 	def guess_word(self, request):
+		"""Guesses the entire word. Returns game state with message."""
 		game = get_by_urlsafe(request.urlsafe_game_key, Game)
 		if game.game_over:
 			return game.to_form("Game is already over!")
 		if request.guess.lower() == game.word.lower():
+			# Algorithm for calculating score:
+			# Ceiling (blanks remaining / length of word * 10) - penalty
+			# --> Correct guess up front = 10 pts
+			# --> Correct guess w/ one letter left ~= 1 pt
+			# penalty == incorrect word (not letter) guesses
+			score = round((game.word_so_far.count('_') / len(game.word)) * 10 - game.penalty, 1)
+			# if score < 1.0:
+			# 	score = 1.0
 			game.word_so_far = game.word
-			game.end_game(True)
-			return game.to_form("You won!")
+			game.end_game(True, score)
+			message = "You won! Score is " + str(score) + "."
+			return game.to_form(message)
 		game.attempts_remaining -= 1
 		if game.attempts_remaining < 1:
-			game.end_game(False)
-			return game.to_form("Game over!")
+			game.end_game(False, 0.0)
+			return game.to_form("Game over! Score is 0.")
 		else:
+			# Assess a penalty for incorrect guess (subtracted from total score)
+			game.penalty += 1.0
 			game.put()
-			return game.to_form("Incorrect guess!")
+			message = "Incorrect guess! Penalty is " + str(game.penalty) + "."
+			return game.to_form(message)
 
 
 	@endpoints.method(response_message=ScoreForms,
@@ -168,6 +183,8 @@ class PokemonHangmanAPI(remote.Service):
 					  http_method="GET")
 	def get_user_games(self, request):
 		"""Get all games created by user."""
+		# TODO
+		# Refactor to take user name instead of key
 		user = get_by_urlsafe(request.urlsafe_user_key, User)
 		if user:
 			query = Game.query(ancestor=user.key)
@@ -197,6 +214,7 @@ class PokemonHangmanAPI(remote.Service):
 					  name="get_high_scores",
 					  http_method="GET")
 	def get_high_scores(self, request):
+		"""Returns the n highest scores"""
 		number_of_results = 5 # default
 		if request.number_of_results:
 			number_of_results = request.number_of_results
@@ -210,6 +228,7 @@ class PokemonHangmanAPI(remote.Service):
 					  name="get_user_rankings",
 					  http_method="GET")
 	def get_user_rankings(self, request):
+		"""Ranks users by their total score."""
 		results = []
 		users = User.query()
 		for user in users:
