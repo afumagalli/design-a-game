@@ -14,11 +14,10 @@ from models import UserForm, UserForms, GameForm, GameForms, NewGameForm, GuessF
 from utils import get_by_urlsafe
 
 
-USER_REQUEST = endpoints.ResourceContainer(user_name=messages.StringField(1), email=messages.StringField(2))
+USER_REQUEST = endpoints.ResourceContainer(user_name=messages.StringField(1))
 NEW_GAME_REQUEST = endpoints.ResourceContainer(NewGameForm)
 GAME_REQUEST = endpoints.ResourceContainer(urlsafe_game_key=messages.StringField(1))
-GUESS_REQUEST = endpoints.ResourceContainer(GuessForm, urlsafe_game_key=messages.StringField(1),)
-GET_USER_GAMES_REQUEST = endpoints.ResourceContainer(urlsafe_user_key=messages.StringField(1))
+GUESS_REQUEST = endpoints.ResourceContainer(GuessForm, urlsafe_game_key=messages.StringField(1))
 CANCEL_GAME_REQUEST = endpoints.ResourceContainer(urlsafe_game_key=messages.StringField(1))
 HIGH_SCORES_REQUEST = endpoints.ResourceContainer(number_of_results=messages.IntegerField(1))
 MEMCACHE_GUESSES_REMAINING = "GUESSES_REMAINING"
@@ -161,8 +160,7 @@ class PokemonHangmanAPI(remote.Service):
 		"""Returns all of an individual User's scores"""
 		user = User.query(User.name == request.user_name).get()
 		if not user:
-			raise endpoints.NotFoundException(
-					'A User with that name does not exist!')
+			raise endpoints.NotFoundException('A User with that name does not exist!')
 		scores = Score.query(Score.user == user.key)
 		return ScoreForms(items=[score.to_form() for score in scores])
 
@@ -176,21 +174,18 @@ class PokemonHangmanAPI(remote.Service):
 		return StringMessage(message=memcache.get(MEMCACHE_GUESSES_REMAINING) or '')
 
 
-	@endpoints.method(request_message=GET_USER_GAMES_REQUEST,
+	@endpoints.method(request_message=USER_REQUEST,
 					  response_message=GameForms,
-					  path="user_games/{urlsafe_user_key}",
+					  path="games/user/{user_name}",
 					  name="get_user_games",
 					  http_method="GET")
 	def get_user_games(self, request):
 		"""Get all games created by user."""
-		# TODO
-		# Refactor to take user name instead of key
-		user = get_by_urlsafe(request.urlsafe_user_key, User)
-		if user:
-			query = Game.query(ancestor=user.key)
-			return GameForms(items=[game.to_form("") for game in query])
-		else:
-			raise endpoints.NotFoundException("User not found!")
+		user = User.query(User.name == request.user_name).get()
+		if not user:
+			raise endpoints.NotFoundException('A User with that name does not exist!')
+		query = Game.query(ancestor=user.key)
+		return GameForms(items=[game.to_form("") for game in query])
 
 
 	@endpoints.method(request_message=CANCEL_GAME_REQUEST,
