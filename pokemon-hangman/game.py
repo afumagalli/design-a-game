@@ -14,7 +14,7 @@ from models import UserForm, UserForms, GameForm, GameForms, NewGameForm, GuessF
 from utils import get_by_urlsafe
 
 
-USER_REQUEST = endpoints.ResourceContainer(user_name=messages.StringField(1))
+USER_REQUEST = endpoints.ResourceContainer(user_name=messages.StringField(1), email=messages.StringField(2))
 NEW_GAME_REQUEST = endpoints.ResourceContainer(NewGameForm)
 GAME_REQUEST = endpoints.ResourceContainer(urlsafe_game_key=messages.StringField(1))
 GUESS_REQUEST = endpoints.ResourceContainer(GuessForm, urlsafe_game_key=messages.StringField(1))
@@ -262,6 +262,7 @@ class PokemonHangmanAPI(remote.Service):
 					  name="get_game_history",
 					  http_method="GET")
 	def get_game_history(self, request):
+		"""Returns a history of all moves made in game."""
 		game = get_by_urlsafe(request.urlsafe_game_key, Game)
 		history = History.query(ancestor=game.key).order(History.order)
 		return HistoryForms(items=[move.to_form() for move in history])
