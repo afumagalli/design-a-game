@@ -26,17 +26,13 @@ class Game(ndb.Model):
 	word = ndb.StringProperty(required=True)
 	word_so_far = ndb.StringProperty(required=True)
 	attempts_remaining = ndb.IntegerProperty(required=True, default=6)
-	guessed_letters = ndb.StringProperty(required=True, default="")
+	past_guesses = ndb.StringProperty(repeated=True)
 	game_over = ndb.BooleanProperty(required=True, default=False)
 	penalty = ndb.FloatProperty(required=True, default=0.0)
 
 	@classmethod
 	def new_game(cls, user):
 		"""Creates and returns a new game"""
-		# if number:
-		# 	word = POKEMON_LIST.get_name(number)
-		# else:
-		# 	word = POKEMON_LIST.get_random_name()
 		word = POKEMON_LIST.get_random_name()
 		word_so_far = "_" * len(word)
 		game = Game(parent=user,
@@ -47,6 +43,15 @@ class Game(ndb.Model):
 					game_over=False)
 		game.put()
 		return game
+
+	def save_history(self, guess, message, order):
+		"""Saves the last made move to history"""
+		move = History(parent=self.key,
+					   guess=guess,
+					   message=message,
+					   order=order)
+		move.put()
+		return move
 
 	def to_form(self, message):
 		"""Returns a GameForm representation of the Game"""
@@ -68,16 +73,31 @@ class Game(ndb.Model):
 
 class Score(ndb.Model):
 	"""Score object"""
-	# TODO
-	# Redefine score as number of _ remaining when word correctly guessed
-	# (perhaps as percentage of length of word to normalize length of word)
 	user = ndb.KeyProperty(required=True, kind="User")
 	date = ndb.DateProperty(required=True)
 	won = ndb.BooleanProperty(required=True)
 	score = ndb.FloatProperty(required=True)
 
 	def to_form(self):
-		return ScoreForm(user_name=self.user.get().name, won=self.won, date=str(self.date), score=self.score)
+		form = ScoreForm()
+		form.user_name = self.user.get().name
+		form.won = self.won
+		form.date = str(self.date)
+		form.score = self.score
+		return form
+
+
+class History(ndb.Model):
+	"""Object representing a past guess and result"""
+	guess = ndb.StringProperty(required=True)
+	message = ndb.StringProperty(required=True)
+	order = ndb.IntegerProperty(required=True)
+
+	def to_form(self):
+		form = HistoryForm()
+		form.guess = self.guess
+		form.message = self.message
+		return form
 
 
 class UserForm(messages.Message):
@@ -125,6 +145,15 @@ class ScoreForm(messages.Message):
 class ScoreForms(messages.Message):
 	"""Return multiple ScoreForms"""
 	items = messages.MessageField(ScoreForm, 1, repeated=True)
+
+
+class HistoryForm(messages.Message):
+	guess = messages.StringField(1, required=True)
+	message = messages.StringField(2, required=True)
+
+
+class HistoryForms(messages.Message):
+	items = messages.MessageField(HistoryForm, 1, repeated=True)
 
 
 class StringMessage(messages.Message):

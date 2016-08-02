@@ -8,8 +8,8 @@ from protorpc import remote, messages
 from google.appengine.api import memcache
 from google.appengine.api import taskqueue
 
-from models import User, Game, Score
-from models import UserForm, UserForms, GameForm, GameForms, NewGameForm, GuessForm, ScoreForm, ScoreForms, StringMessage
+from models import User, Game, Score, History
+from models import UserForm, UserForms, GameForm, GameForms, NewGameForm, GuessForm, ScoreForm, ScoreForms, HistoryForm, HistoryForms, StringMessage
 
 from utils import get_by_urlsafe
 
@@ -53,7 +53,7 @@ class PokemonHangmanAPI(remote.Service):
 		if not user:
 			raise endpoints.NotFoundException("A user with that name does not exist!")
 		game = Game.new_game(user.key)
-		# Task queue updates average score.
+		# Task queue updates average attempts remaining.
 		taskqueue.add(url="/tasks/cache_average_attempts")
 		return game.to_form("Good luck playing Pokemon Hangman!")
 
@@ -82,29 +82,43 @@ class PokemonHangmanAPI(remote.Service):
 		game = get_by_urlsafe(request.urlsafe_game_key, Game)
 		if game.game_over:
 			return game.to_form("Game is already over!")
-		if request.guess in game.guessed_letters:
+		if not request.guess:
+			return game.to_form("Please guess a letter.")
+		if request.guess.lower() in game.past_guesses:
 			return game.to_form("You already guessed that letter!")
-		game.guessed_letters += request.guess
+		if len(request.guess) != 1:
+			return game.to_form("You can only guess a single letter.")
+
+		game.past_guesses.append(request.guess.lower())
+		move_number = len(game.past_guesses)
 		if request.guess.lower() in game.word.lower():
 			guess_instances = [i for i, ltr in enumerate(game.word.lower()) if ltr == request.guess.lower()]
 			for i in guess_instances:
 				game.word_so_far = game.word_so_far[:i] + game.word[i] + game.word_so_far[i+1:]
 			if game.word_so_far == game.word:
 				# 1 point for guessing final letter
+				message = "You won! Score is 1."
+				game.save_history(request.guess, message, move_number)
 				game.end_game(True, 1.0)
-				return game.to_form("You won! Score is 1.")
+				return game.to_form(message)
 			else:
+				message = "Correct guess! Word so far: " + game.word_so_far
+				game.save_history(request.guess, message, move_number)
 				game.put()
-				return game.to_form("Correct guess!")
+				return game.to_form(message)
 		else:
 			game.attempts_remaining -= 1
 			if game.attempts_remaining < 1:
 				# 0 points for loss
+				message = "Game over! Score is 0."
+				game.save_history(request.guess, message, move_number)
 				game.end_game(False, 0.0)
-				return game.to_form("Game over! Score is 0.")
+				return game.to_form(message)
 			else:
+				message = "Incorrect guess! Word so far: " + game.word_so_far
+				game.save_history(request.guess, message, move_number)
 				game.put()
-				return game.to_form("Incorrect guess!")
+				return game.to_form(message)
 
 
 	@endpoints.method(request_message=GUESS_REQUEST,
@@ -117,6 +131,10 @@ class PokemonHangmanAPI(remote.Service):
 		game = get_by_urlsafe(request.urlsafe_game_key, Game)
 		if game.game_over:
 			return game.to_form("Game is already over!")
+		if request.guess.lower() in game.past_guesses:
+			return game.to_form("You already guessed that word!")
+		game.past_guesses.append(request.guess.lower())
+		move_number = len(game.past_guesses)
 		if request.guess.lower() == game.word.lower():
 			# Algorithm for calculating score:
 			# Ceiling (blanks remaining / length of word * 10) - penalty
@@ -124,21 +142,25 @@ class PokemonHangmanAPI(remote.Service):
 			# --> Correct guess w/ one letter left ~= 1 pt
 			# penalty == incorrect word (not letter) guesses
 			score = round((game.word_so_far.count('_') / len(game.word)) * 10 - game.penalty, 1)
-			# if score < 1.0:
-			# 	score = 1.0
+			if score < 1.0:
+				score = 1.0
 			game.word_so_far = game.word
-			game.end_game(True, score)
 			message = "You won! Score is " + str(score) + "."
+			game.save_history(request.guess, message, move_number)
+			game.end_game(True, score)
 			return game.to_form(message)
 		game.attempts_remaining -= 1
 		if game.attempts_remaining < 1:
+			message = "Game over! Score is 0."
+			game.save_history(request.guess, message, move_number)
 			game.end_game(False, 0.0)
-			return game.to_form("Game over! Score is 0.")
+			return game.to_form(message)
 		else:
 			# Assess a penalty for incorrect guess (subtracted from total score)
 			game.penalty += 1.0
-			game.put()
 			message = "Incorrect guess! Penalty is " + str(game.penalty) + "."
+			game.save_history(request.guess, message, move_number)
+			game.put()
 			return game.to_form(message)
 
 
@@ -234,13 +256,15 @@ class PokemonHangmanAPI(remote.Service):
 		return UserForms(items=[result[0].to_form(result[1]) for result in results])
 
 
-	# @endpoints.method(request_message=GAME_REQUEST,
-	# 				  response_message=GameForm,
-	# 				  path="game/{urlsafe_game_key}/history",
-	# 				  name="get_game_history",
-	# 				  http_method="GET")
-	# def get_game_history(self, request):
-	# 	pass
+	@endpoints.method(request_message=GAME_REQUEST,
+					  response_message=HistoryForms,
+					  path="game/{urlsafe_game_key}/history",
+					  name="get_game_history",
+					  http_method="GET")
+	def get_game_history(self, request):
+		game = get_by_urlsafe(request.urlsafe_game_key, Game)
+		history = History.query(ancestor=game.key).order(History.order)
+		return HistoryForms(items=[move.to_form() for move in history])
 
 
 	@staticmethod
