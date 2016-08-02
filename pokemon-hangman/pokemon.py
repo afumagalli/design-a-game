@@ -1,3 +1,5 @@
+"""pokemon.py - Contains code for generating a list of Pokemon names and selecting one at random or by number"""
+
 import os
 from random import randrange
 

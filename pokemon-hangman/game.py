@@ -1,4 +1,4 @@
-"""game.py - Description here."""
+"""game.py - Contains all of the APIs and game logic"""
 
 from __future__ import division
 import math
@@ -79,6 +79,8 @@ class PokemonHangmanAPI(remote.Service):
 	def guess_letter(self, request):
 		"""Guesses a letter. Returns game state with message."""
 		game = get_by_urlsafe(request.urlsafe_game_key, Game)
+
+		# Ensure valid input
 		if game.game_over:
 			return game.to_form("Game is already over!")
 		if not request.guess:
@@ -88,6 +90,7 @@ class PokemonHangmanAPI(remote.Service):
 		if len(request.guess) != 1:
 			return game.to_form("You can only guess a single letter.")
 
+		# Assess the guessed letter
 		game.past_guesses.append(request.guess.lower())
 		move_number = len(game.past_guesses)
 		if request.guess.lower() in game.word.lower():
@@ -136,9 +139,10 @@ class PokemonHangmanAPI(remote.Service):
 		move_number = len(game.past_guesses)
 		if request.guess.lower() == game.word.lower():
 			# Algorithm for calculating score:
-			# Ceiling (blanks remaining / length of word * 10) - penalty
-			# --> Correct guess up front = 10 pts
-			# --> Correct guess w/ one letter left ~= 1 pt
+			# round to one decimal place:
+			# (blanks remaining / length of word * 10) - penalty
+			# --> Correct guess up front = 10.0 pts
+			# --> Correct guess w/ one letter left ~= 1.0 pt
 			# penalty == incorrect word (not letter) guesses
 			score = round((game.word_so_far.count('_') / len(game.word)) * 10 - game.penalty, 1)
 			if score < 1.0:

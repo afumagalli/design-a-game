@@ -1,4 +1,4 @@
-"""utils.py - Desc here"""
+"""utils.py - Contains a function for getting an entity from its urlsafe key"""
 
 import logging
 import endpoints

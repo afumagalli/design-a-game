@@ -14,8 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-"""main.py - This file contains handlers that are called by taskqueue and/or
-cronjobs."""
+"""main.py - This file contains handlers that are called by taskqueue and cronjobs"""
 import logging
 
 import webapp2

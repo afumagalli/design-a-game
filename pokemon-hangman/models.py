@@ -1,4 +1,4 @@
-"""models.py - Description here."""
+"""models.py - Contains all Datastore models and ProtoRPC messages for the game"""
 
 import random
 from pokemon import PokemonNames
@@ -101,11 +101,13 @@ class History(ndb.Model):
 
 
 class UserForm(messages.Message):
+	"""UserForm for outbound user information"""
 	user_name = messages.StringField(1, required=True)
 	total_score = messages.FloatField(2, required=True)
 
 
 class UserForms(messages.Message):
+	"""Returns multiple UserForms"""
 	items = messages.MessageField(UserForm, 1, repeated=True)
 
 
@@ -148,11 +150,13 @@ class ScoreForms(messages.Message):
 
 
 class HistoryForm(messages.Message):
+	"""Form for outbound History information"""
 	guess = messages.StringField(1, required=True)
 	message = messages.StringField(2, required=True)
 
 
 class HistoryForms(messages.Message):
+	"""Returns multiple HistoryForms"""
 	items = messages.MessageField(HistoryForm, 1, repeated=True)
 
 
