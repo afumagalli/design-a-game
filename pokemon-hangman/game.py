@@ -1,8 +1,6 @@
 """game.py - Contains all of the APIs and game logic"""
 
 from __future__ import division
-import math
-import logging
 import endpoints
 from protorpc import remote, messages
 from google.appengine.api import memcache
@@ -81,8 +79,11 @@ class PokemonHangmanAPI(remote.Service):
 		game = get_by_urlsafe(request.urlsafe_game_key, Game)
 
 		# Ensure valid input
-		if game.game_over:
-			return game.to_form("Game is already over!")
+		if game:
+			if game.game_over:
+				return game.to_form("Game is already over!")
+		else:
+			raise endpoints.NotFoundException("Game not found. Start a new game!")
 		if not request.guess:
 			return game.to_form("Please guess a letter.")
 		if request.guess.lower() in game.past_guesses:
@@ -112,7 +113,7 @@ class PokemonHangmanAPI(remote.Service):
 			game.attempts_remaining -= 1
 			if game.attempts_remaining < 1:
 				# 0 points for loss
-				message = "Game over! Score is 0."
+				message = "Game over! Score is 0. Correct word is: " + game.word
 				game.save_history(request.guess, message, move_number)
 				game.end_game(False, 0.0)
 				return game.to_form(message)
@@ -131,8 +132,11 @@ class PokemonHangmanAPI(remote.Service):
 	def guess_word(self, request):
 		"""Guesses the entire word. Returns game state with message."""
 		game = get_by_urlsafe(request.urlsafe_game_key, Game)
-		if game.game_over:
-			return game.to_form("Game is already over!")
+		if game:
+			if game.game_over:
+				return game.to_form("Game is already over!")
+		else:
+			raise endpoints.NotFoundException("Game not found. Start a new game!")
 		if request.guess.lower() in game.past_guesses:
 			return game.to_form("You already guessed that word!")
 		game.past_guesses.append(request.guess.lower())
@@ -154,14 +158,14 @@ class PokemonHangmanAPI(remote.Service):
 			return game.to_form(message)
 		game.attempts_remaining -= 1
 		if game.attempts_remaining < 1:
-			message = "Game over! Score is 0."
+			message = "Game over! Score is 0. Correct word is: " + game.word
 			game.save_history(request.guess, message, move_number)
 			game.end_game(False, 0.0)
 			return game.to_form(message)
 		else:
 			# Assess a penalty for incorrect guess (subtracted from total score)
 			game.penalty += 1.0
-			message = "Incorrect guess! Penalty is " + str(game.penalty) + "."
+			message = "Incorrect guess! Penalty is " + str(game.penalty) + ". Word so far: " + game.word_so_far
 			game.save_history(request.guess, message, move_number)
 			game.put()
 			return game.to_form(message)
@@ -217,15 +221,17 @@ class PokemonHangmanAPI(remote.Service):
 					  response_message=GameForm,
 					  path="game/{urlsafe_game_key}/cancel",
 					  name="cancel_game",
-					  http_method="PUT")
+					  http_method="DELETE")
 	def cancel_game(self, request):
 		"""Cancels a game by deleting it from the Datastore"""
 		game = get_by_urlsafe(request.urlsafe_game_key, Game)
-		if game.game_over:
-			return game.to_form("Game is already over!")
-		form = game.to_form("Game cancelled")
-		game.key.delete()
-		return form
+		if game:
+			if game.game_over:
+				return game.to_form("Game is already over!")
+			game.key.delete()
+			return game.to_form("Game cancelled")
+		else:
+			raise endpoints.NotFoundException("Game not found!")
 
 
 	@endpoints.method(request_message=HIGH_SCORES_REQUEST,
