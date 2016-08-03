@@ -128,7 +128,6 @@ class GameForms(messages.Message):
 class NewGameForm(messages.Message):
 	"""Form for creting a new game"""
 	user_name = messages.StringField(1, required=True)
-	#number = messages.BooleanField(2, required=False)
 
 
 class GuessForm(messages.Message):

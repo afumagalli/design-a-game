@@ -65,6 +65,5 @@ def get_by_urlsafe(urlsafe, model):
 	if not entity:
 		return None
 	if not isinstance(entity, model):
-		logging.debug(model)
-		raise ValueError('Incorrect Kind')
+		raise endpoints.BadRequestException('Incorrect Kind')
 	return entity
