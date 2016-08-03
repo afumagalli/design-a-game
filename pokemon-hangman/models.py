@@ -1,7 +1,7 @@
 """models.py - Contains all Datastore models and ProtoRPC messages for the game"""
 
 import random
-from pokemon import PokemonNames
+from utils import PokemonNames
 from datetime import date
 from protorpc import messages
 from google.appengine.ext import ndb
