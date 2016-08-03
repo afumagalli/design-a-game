@@ -273,8 +273,11 @@ class PokemonHangmanAPI(remote.Service):
 	def get_game_history(self, request):
 		"""Returns a history of all moves made in game."""
 		game = get_by_urlsafe(request.urlsafe_game_key, Game)
-		history = History.query(ancestor=game.key).order(History.order)
-		return HistoryForms(items=[move.to_form() for move in history])
+		if game:
+			history = History.query(ancestor=game.key).order(History.order)
+			return HistoryForms(items=[move.to_form() for move in history])
+		else:
+			raise endpoints.NotFoundException("Game not found!")
 
 
 	@staticmethod
